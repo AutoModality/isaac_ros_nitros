@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA CORPORATION and its licensors retain all intellectual property
  * and proprietary rights in and to this software, related documentation
@@ -69,6 +69,26 @@ NitrosSubscriber::NitrosSubscriber(
     node, nitros_type_manager, gxf_component_info, supported_data_formats, config)
 {
   setContext(context);
+}
+
+NitrosSubscriber::NitrosSubscriber(
+  rclcpp::Node & node,
+  const gxf_context_t context,
+  std::shared_ptr<NitrosTypeManager> nitros_type_manager,
+  const gxf::optimizer::ComponentInfo & gxf_component_info,
+  const std::vector<std::string> & supported_data_formats,
+  const NitrosPublisherSubscriberConfig & config,
+  const NitrosStatisticsConfig & statistics_config)
+: NitrosSubscriber(
+    node, context, nitros_type_manager, gxf_component_info, supported_data_formats, config)
+{
+  statistics_config_ = statistics_config;
+
+  if (statistics_config_.enable_statistics) {
+    // Initialize statistics variables and message fields
+    statistics_msg_.is_subscriber = true;
+    initStatistics();
+  }
 }
 
 std::shared_ptr<negotiated::NegotiatedSubscription> NitrosSubscriber::getNegotiatedSubscriber()
@@ -180,7 +200,9 @@ void NitrosSubscriber::postNegotiationCallback()
 
   auto topics_info = negotiated_sub_->get_negotiated_topics_info();
   if (!topics_info.success || topics_info.negotiated_topics.size() == 0) {
-    RCLCPP_INFO(node_.get_logger(), "[NitrosSubscriber] Negotiation failed");
+    RCLCPP_INFO(
+      node_.get_logger(),
+      "[NitrosSubscriber] Negotiation ended with no results");
     RCLCPP_INFO(
       node_.get_logger(),
       "[NitrosSubscriber] Use the compatible subscriber: "
@@ -235,14 +257,16 @@ void NitrosSubscriber::subscriberCallback(
   NitrosTypeBase & msg_base,
   const std::string data_format_name)
 {
-  #if defined(USE_NVTX)
   std::stringstream nvtx_tag_name;
   nvtx_tag_name <<
     "[" << node_.get_name() << "] NitrosSubscriber::subscriberCallback(" <<
     config_.topic_name << ", t=" <<
     getTimestamp(msg_base) << ")";
   nvtxRangePushWrapper(nvtx_tag_name.str().c_str(), CLR_PURPLE);
-  #endif
+
+  if (statistics_config_.enable_statistics) {
+    updateStatistics();
+  }
 
   RCLCPP_DEBUG(node_.get_logger(), "[NitrosSubscriber] Received a Nitros-typed messgae");
   RCLCPP_DEBUG(node_.get_logger(), "[NitrosSubscriber] \teid: %ld", msg_base.handle);
@@ -285,9 +309,7 @@ void NitrosSubscriber::subscriberCallback(
 
   pushEntity(msg_base.handle);
 
-  #if defined(USE_NVTX)
   nvtxRangePopWrapper();
-  #endif
 }
 
 }  // namespace nitros

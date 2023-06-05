@@ -26,7 +26,7 @@ from sensor_msgs.msg import CameraInfo
 
 @pytest.mark.rostest
 def generate_test_description():
-    """Generate launch description with all ROS2 nodes for testing."""
+    """Generate launch description with all ROS 2 nodes for testing."""
     test_ns = IsaacROSNitrosCameraInfoTest.generate_namespace()
     container = ComposableNodeContainer(
         name='test_container',
@@ -112,11 +112,8 @@ class IsaacROSNitrosCameraInfoTest(IsaacROSBaseTest):
             self.assertEqual(camera_info.height, received_camera_info.height)
             self.assertEqual(camera_info.width, received_camera_info.width)
 
-            if (camera_info.distortion_model == 'plumb_bob' or
-                    camera_info.distortion_model == 'rational_polynomial'):
-                self.assertEqual('rational_polynomial', received_camera_info.distortion_model)
-            else:
-                self.assertEqual('equidistant', received_camera_info.distortion_model)
+            # Distortion model
+            self.assertEqual(camera_info.distortion_model, received_camera_info.distortion_model)
 
             # D
             for i in range(min(len(camera_info.d), len(received_camera_info.d))):
@@ -140,20 +137,12 @@ class IsaacROSNitrosCameraInfoTest(IsaacROSBaseTest):
 
             # P
             self.assertEqual(len(camera_info.p), len(received_camera_info.p))
-            # The P matrix is a 3*4 matrix, while left 3*3 matrix should be identical with K-matrix
+            # The P matrix is a 3*4 matrix
             for i in range(3):
                 for j in range(4):
-                    # Compare with the translation vector
-                    if(j == 3):
-                        self.assertEqual(
-                            round(camera_info.p[i*4+j], 2),
-                            round(received_camera_info.p[i*4+j], 2),
-                            f'{i+1}th P value does not match')
-                    # Compare with the K matrix
-                    else:
-                        self.assertEqual(
-                            round(camera_info.k[i*3+j], 2),
-                            round(received_camera_info.p[i*4+j], 2),
+                    self.assertEqual(
+                            round(camera_info.p[i*3+j], 2),
+                            round(received_camera_info.p[i*3+j], 2),
                             f'{i+1}th P value does not match')
 
             print('The received camera info is verified successfully')

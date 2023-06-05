@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA CORPORATION and its licensors retain all intellectual property
  * and proprietary rights in and to this software, related documentation
@@ -20,7 +20,7 @@ namespace isaac_ros
 namespace nitros
 {
 
-constexpr char PACKAE_NAME[] = "isaac_ros_nitros_occupancy_grid_type";
+constexpr char PACKAGE_NAME[] = "isaac_ros_nitros_occupancy_grid_type";
 constexpr char FORWARD_FORMAT[] = "nitros_occupancy_grid";
 
 #pragma GCC diagnostic push
@@ -44,7 +44,7 @@ public:
               .use_compatible_format_only = true,
             }
           },
-          {"vault/vault",
+          {"sink/sink",
             {
               .type = NitrosPublisherSubscriberType::NEGOTIATED,
               .qos = rclcpp::QoS(1),
@@ -60,18 +60,18 @@ public:
       {},
       // Extension so file list
         {
-          {"isaac_ros_nitros", "gxf/std/libgxf_std.so"},
-          {"isaac_ros_nitros", "gxf/cuda/libgxf_cuda.so"},
-          {"isaac_ros_nitros", "gxf/serialization/libgxf_serialization.so"},
-          {"isaac_ros_nitros", "gxf/libgxf_message_compositor.so"}
+          {"isaac_ros_gxf", "gxf/lib/std/libgxf_std.so"},
+          {"isaac_ros_gxf", "gxf/lib/cuda/libgxf_cuda.so"},
+          {"isaac_ros_gxf", "gxf/lib/serialization/libgxf_serialization.so"},
+          {"isaac_ros_gxf", "gxf/lib/libgxf_message_compositor.so"}
         },
       // Test node package name
-      PACKAE_NAME)
+      PACKAGE_NAME)
   {
     std::string compatible_format = declare_parameter<std::string>("compatible_format", "");
     if (!compatible_format.empty()) {
       config_map_["forward/input"].compatible_data_format = compatible_format;
-      config_map_["vault/vault"].compatible_data_format = compatible_format;
+      config_map_["sink/sink"].compatible_data_format = compatible_format;
     }
 
     registerSupportedType<nvidia::isaac_ros::nitros::NitrosOccupancyGrid>();

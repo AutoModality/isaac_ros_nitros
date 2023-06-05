@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA CORPORATION and its licensors retain all intellectual property
  * and proprietary rights in and to this software, related documentation
@@ -15,6 +15,8 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "isaac_ros_nitros/types/nitros_type_base.hpp"
 
@@ -23,6 +25,7 @@
 
 #include "rclcpp/logger.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "rclcpp/serialization.hpp"
 
 
 constexpr char LOGGER_SUFFIX[] = "NitrosFormatAgent";
@@ -125,8 +128,16 @@ struct NitrosFormatCallbacks
       const rclcpp::SubscriptionOptions & options)>
   addSubscriberSupportedFormatCallback{nullptr};
 
+  std::function<
+    std::shared_ptr<rclcpp::SerializedMessage>(NitrosTypeBase & base_msg)>
+  convertToRosSerializedMessage{nullptr};
 
   // Utilities
+  // Get T's extension list
+  std::function<
+    std::vector<std::pair<std::string, std::string>>()>
+  getExtensions{nullptr};
+
   // Get the corresponding ROS type name for the format T
   std::function<std::string()> getROSTypeName{nullptr};
 };
@@ -223,6 +234,17 @@ public:
         std::placeholders::_4,
         std::placeholders::_5,
         std::placeholders::_6
+      ),
+
+      // convertToRosSerializedMessage
+      std::bind(
+        &NitrosFormatAgent<T>::convertToRosSerializedMessage,
+        std::placeholders::_1
+      ),
+
+      // getExtensions
+      std::bind(
+        &NitrosFormatAgent<T>::getExtensions
       ),
 
       // getROSTypeName
@@ -322,7 +344,6 @@ public:
       compatible_pub->get_topic_name());
   }
 
-
   // Subscriber callbacks
   // Create a compatible subscriber for T
   static void createCompatibleSubscriberCallback(
@@ -333,7 +354,7 @@ public:
     std::function<void(NitrosTypeBase &, const std::string data_format_name)> subscriber_callback,
     const rclcpp::SubscriptionOptions & options)
   {
-    std::function<void(std::shared_ptr<typename T::MsgT>)> internal_subscriber_callback =
+    std::function<void(std::shared_ptr<const typename T::MsgT>)> internal_subscriber_callback =
       std::bind(
       &NitrosFormatAgent<T>::subscriberCallback,
       std::placeholders::_1,
@@ -397,7 +418,7 @@ public:
     std::function<void(NitrosTypeBase &, const std::string data_format_name)> subscriber_callback,
     const rclcpp::SubscriptionOptions & options)
   {
-    std::function<void(std::shared_ptr<typename T::MsgT>)> internal_subscriber_callback =
+    std::function<void(std::shared_ptr<const typename T::MsgT>)> internal_subscriber_callback =
       std::bind(
       &NitrosFormatAgent<T>::subscriberCallback,
       std::placeholders::_1,
@@ -414,6 +435,27 @@ public:
       T::supported_type_name.c_str());
   }
 
+  static std::shared_ptr<rclcpp::SerializedMessage> convertToRosSerializedMessage(
+    NitrosTypeBase & base_msg)
+  {
+    typename rclcpp::TypeAdapter<typename T::MsgT>::ros_message_type ros_message;
+    auto cast_msg = static_cast<typename T::MsgT &>(base_msg);
+    rclcpp::TypeAdapter<typename T::MsgT>::convert_to_ros_message(cast_msg, ros_message);
+
+    std::shared_ptr<rclcpp::SerializedMessage> serialized_ros_message =
+      std::make_shared<rclcpp::SerializedMessage>();
+
+    static rclcpp::Serialization<
+      typename rclcpp::TypeAdapter<typename T::MsgT>::ros_message_type> serializer;
+    serializer.serialize_message(&ros_message, serialized_ros_message.get());
+
+    return serialized_ros_message;
+  }
+
+  static std::vector<std::pair<std::string, std::string>> getExtensions()
+  {
+    return T::MsgT::GetExtensions();
+  }
 
   // Utilities
   // Get the corresponding ROS type name for the format T
@@ -425,7 +467,7 @@ public:
 
 private:
   static void subscriberCallback(
-    const std::shared_ptr<typename T::MsgT> msg,
+    const std::shared_ptr<const typename T::MsgT> msg,
     std::function<void(
       NitrosTypeBase &,
       const std::string data_format_name)> subscriber_callback)
